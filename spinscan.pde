@@ -8,14 +8,21 @@ Serial serial;
 Capture cam;
 MovieMaker movie;
 OpenCV opencv;
+SteppedMovie textureMovie;
+SteppedMovie laserMovie;
 
 int width = 860;
 int height = 720;
 int framerate = 30;
-int threshold = 10;
+int threshold = 100;
+int frame = 1;
 
 String serialResponse = null;
 boolean recording = false;
+String recordingType = null;
+boolean laserScanLoaded = false;
+boolean textureScanLoaded = false;
+boolean processing = false;
 
 String serialPort = null;
 String camPort = null;
@@ -34,8 +41,8 @@ Textfield camVFOVField;
 Textfield camDistanceField;
 Textfield laserOffsetField;
 
-String textureFilename = "texture.mov";
-String laserFilename = "laser.mov";
+String textureFilename = null;
+String laserFilename = null;
 
 // degrees
 float camHFOV = 50.0;
@@ -52,6 +59,10 @@ int avgVertical = 10;
 int brightness = 0;
 int contrast = 0;
 
+PImage textureImage;
+PImage laserImage;
+PImage lineImage;
+
 void setup() {
   size(width,height);
 //  smooth();
@@ -62,14 +73,23 @@ void setup() {
 
   controlP5 = new ControlP5(this);
 
-  laserBox = controlP5.addCheckBox("laserBox", 10, 55);  
+  laserBox = controlP5.addCheckBox("laserBox", 10, 100);
   laserBox.setItemsPerRow(1);
   laserBox.setSpacingColumn(30);
   laserBox.setSpacingRow(10);
   laserBox.addItem("Laser", 1);
 
-  controlP5.addButton("textureScan", 0, 10, 70, 90, 15).captionLabel().set("Record Texture");
-  controlP5.addButton("laserScan", 0, 120, 70, 90, 15).captionLabel().set("Record Laser");
+  controlP5.addButton("textureScan", 0, 10, 120, 90, 15).captionLabel().set("Record Texture");
+  controlP5.addButton("openTextureScan", 0, 230, height-25, 100, 15).captionLabel().set("Open Texture Scan");
+
+  controlP5.addButton("laserScan", 0, 120, 120, 90, 15).captionLabel().set("Record Laser");
+  controlP5.addButton("openLaserScan", 0, 550, height-25, 100, 15).captionLabel().set("Open Laser Scan");
+
+  controlP5.addSlider("brightness", -128, 128, contrast, 10, 60, 150, 10);
+  Slider contrastSlider = (Slider)controlP5.controller("contrast");
+  
+  controlP5.addSlider("contrast", -128, 128, contrast, 10, 80, 150, 10);
+  Slider brightnessSlider = (Slider)controlP5.controller("brightness");
 
   camPorts = Capture.list();
   camList = controlP5.addListBox("camList", 10, 50, 200, 120);
@@ -109,11 +129,7 @@ void setup() {
   laserOffsetField.captionLabel().set("Laser Offset (deg)");
   laserOffsetField.setText(str(laserOffset));
 
-  controlP5.addSlider("brightness", -128, 128, contrast, 10, 120, 150, 10);
-  Slider contrastSlider = (Slider)controlP5.controller("contrast");
-  
-  controlP5.addSlider("contrast", -128, 128, contrast, 10, 140, 150, 10);
-  Slider brightnessSlider = (Slider)controlP5.controller("brightness");
+  controlP5.addButton("processScans", 0, 10, 320, 90, 15).captionLabel().set("Process Scans!");
 }
 
 void draw() {
@@ -129,18 +145,41 @@ void draw() {
 
     PImage opencvImage = opencv.image();
 
-    image(opencvImage, 220, 0);    
-    
-//    opencvImage.loadPixels();
-
     if (recording) {
       movie.addFrame(opencvImage.pixels, opencvImage.width, opencvImage.height);
+    } else {
+      // don't waste cpu cycles while recording?
+      image(opencvImage, 220, 0);
     }
 
+    // main video window crosshair
     stroke(255);
     line(640/2+220, 0, 640/2+220, 480);
     line(220, 480/2, 640+220, 480/2);
   }
+  
+  if (textureScanLoaded) {
+    image(textureMovie, 220, 480, 320, 240);
+  }
+
+  if (laserScanLoaded) {
+    image(laserMovie, 540, 480, 320, 240);
+  }
+
+  if (processing) {
+    if (!laserMovie.done()) {
+      processScanFrame();
+      frame++;
+    }
+    
+    image(laserImage, 220, 0);
+  }
+
+  // window outlines
+  stroke(50);
+  line(220, 0, 220, height);
+  line(220, 480, width, 480);
+  line(540, 480, 540, height);
 }
 
 void controlEvent(ControlEvent theEvent) {
@@ -175,10 +214,37 @@ void serialEvent(Serial serial) {
   serialResponse = serial.readStringUntil('\n');
   if (recording) {
     recording = false;
-    delay(50);
     movie.finish();
+    delay(50);
+    if (recordingType == "texture") {
+      loadTextureScan();
+    } else {
+      loadLaserScan();
+    }
+    recordingType = null;
+    laser(false);
   }
   println("RECEIVED: " + serialResponse);
+}
+
+public void loadTextureScan() {
+  textureMovie = new SteppedMovie(this, textureFilename);
+  textureMovie.precalcFrameTimes();
+  println("textureScan frame count: " + textureMovie.getFrameCount());
+  delay(50);
+  textureMovie.read();
+  textureImage = textureMovie.get();
+  textureScanLoaded = true;
+}
+
+public void loadLaserScan() {
+  laserMovie = new SteppedMovie(this, laserFilename);
+  laserMovie.precalcFrameTimes();
+  println("laserScan frame count: " + laserMovie.getFrameCount());
+  delay(50);
+  laserMovie.read();
+  laserImage = laserMovie.get();
+  laserScanLoaded = true;
 }
 
 public void laser(boolean on) {
@@ -193,21 +259,54 @@ public void laser(boolean on) {
 
 public void laserScan(int theValue) {
   if (serialConnected) {
-    movie = new MovieMaker(this, 640, 480, laserFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
-    serial.write('3');
-    delay(50);
-    recording = true;
+    laserFilename = selectOutput("Save laser .mov to..."); 
+    if (laserFilename == null) {
+      println("ERROR: No laser output file was selected");
+    } else {
+      // make sure the laser is really on!
+      laser(true);
+      delay(100);
+      movie = new MovieMaker(this, 640, 480, laserFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
+      serial.write('2');
+      recordingType = "laser";
+      recording = true;
+    }
   } else {
     println("ERROR: Serial not connected");
   }
 }
 
+public void openTextureScan(int theValue) {
+  textureFilename = selectInput("Open texture .mov file...");
+  
+  if (textureFilename == null) {
+    println("ERROR: No texture file was selected");
+  } else {
+    loadTextureScan();
+  }
+}
+
+public void openLaserScan(int theValue) {
+  laserFilename = selectInput("Open laser .mov file...");
+  
+  if (laserFilename == null) {
+    println("ERROR: No laser file was selected");
+  } else {
+    loadLaserScan();
+  }
+}
+
 public void textureScan(int theValue) {
   if (serialConnected) {
-    movie = new MovieMaker(this, 640, 480, textureFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
-    serial.write('2');
-    delay(50);
-    recording = true;
+    textureFilename = selectOutput("Save texture .mov to...");
+    if (textureFilename == null) {
+      println("ERROR: No texture output file was selected");
+    } else {
+      movie = new MovieMaker(this, 640, 480, textureFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
+      serial.write('2');
+      recording = true;
+      recordingType = "texture";
+    }
   } else {
     println("ERROR: Serial not connected");
   }
@@ -222,6 +321,53 @@ public void serialConnect() {
 public void camConnect() {
   cam = new Capture(this, 640, 480, camPort, framerate);
   camConnected = true;
+}
+
+public void processScans() {
+  processing = true;
+  camConnected = false;
+}
+
+public void processScanFrame() {
+//  println("Processing frame: " + frame);
+  
+  laserMovie.gotoFrameNumber(frame);
+
+  laserMovie.read();
+
+  laserImage = laserMovie.get();
+
+  int brightestX = 0;
+  float brightestValue = 0;
+  
+  laserImage.loadPixels();
+  
+  int index = 0;
+  
+  for (int y = 0; y < 480; y++) {
+    brightestValue = 0;
+    brightestX = 0;
+    
+    for (int x = 0; x < 640; x++) {      
+      int pixelValue = laserImage.pixels[index];      
+      float pixelBrightness = brightness(pixelValue);
+      
+      if (pixelBrightness > brightestValue && pixelBrightness > threshold) {
+        brightestValue = pixelBrightness;
+        brightestX = x;
+      }
+      
+      index++;
+      
+    }
+    
+    if (brightestX > 0) {
+      laserImage.pixels[y*640+brightestX] = color(0, 255, 0);
+    }
+    
+  }
+
+  laserImage.updatePixels();
 }
 
 //void setup() {
