@@ -10,12 +10,17 @@ MovieMaker movie;
 OpenCV opencv;
 SteppedMovie textureMovie;
 SteppedMovie laserMovie;
+ArrayList pointList = new ArrayList();
+PrintWriter plyFile;
 
 int width = 860;
 int height = 720;
 int framerate = 30;
 int threshold = 100;
 int frame = 1;
+
+int videoWidth = 640;
+int videoHeight = 480;
 
 String serialResponse = null;
 boolean recording = false;
@@ -41,8 +46,9 @@ Textfield camVFOVField;
 Textfield camDistanceField;
 Textfield laserOffsetField;
 
-String textureFilename = null;
-String laserFilename = null;
+String textureFilename = "data/texture.mov";
+String laserFilename = "data/laser.mov";
+String plyFilename = null;
 
 // degrees
 float camHFOV = 50.0;
@@ -52,6 +58,10 @@ float camVFOV = camHFOV * 4.0 / 5.0;
 float camDistance = 304.8;
 // degrees
 float laserOffset = 15.0;
+int frameSkip = 1;
+int pointSkip = 1;
+float radiansToDegrees = 180.0 / 3.14159;
+float degreesToRadians = 3.14159 / 180.0;
 
 int avgHorizontal = 10;
 int avgVertical = 10;
@@ -64,12 +74,12 @@ PImage laserImage;
 PImage lineImage;
 
 void setup() {
-  size(width,height);
+  size(width, height);
 //  smooth();
   frameRate(framerate);
 
   opencv = new OpenCV(this);
-  opencv.allocate(640, 480);
+  opencv.allocate(videoWidth, videoHeight);
 
   controlP5 = new ControlP5(this);
 
@@ -130,6 +140,9 @@ void setup() {
   laserOffsetField.setText(str(laserOffset));
 
   controlP5.addButton("processScans", 0, 10, 320, 90, 15).captionLabel().set("Process Scans!");
+  
+//  loadTextureScan();
+  loadLaserScan();
 }
 
 void draw() {
@@ -154,8 +167,39 @@ void draw() {
 
     // main video window crosshair
     stroke(255);
-    line(640/2+220, 0, 640/2+220, 480);
-    line(220, 480/2, 640+220, 480/2);
+    line(videoWidth/2+220, 0, videoWidth/2+220, videoHeight);
+    line(220, videoHeight/2, videoWidth+220, videoHeight/2);
+  }
+
+  if (processing) {
+    if (laserMovie.done()) {
+      plyFile = createWriter(plyFilename);
+      plyFile.println("ply");
+      plyFile.println("format ascii 1.0");
+      plyFile.println("comment Made with spinscan!");
+      plyFile.println("element vertex " + pointList.size());
+      plyFile.println("property float x");
+      plyFile.println("property float y");
+      plyFile.println("property float z");
+      plyFile.println("end_header");
+      
+      for (int i = 0; i < pointList.size(); i++) {
+        float[] thisPoint = (float[]) pointList.get(i);
+        plyFile.println(thisPoint[0] + " " + thisPoint[1] + " " + thisPoint[2]);
+//        println("Writing line: " + i);
+      }
+
+      plyFile.flush();
+      plyFile.close();
+      
+      println("Finished!");
+      processing = false;
+    } else {
+      processScanFrame();
+      frame++;
+    }
+    
+//    image(laserImage, 220, 0);
   }
   
   if (textureScanLoaded) {
@@ -163,16 +207,7 @@ void draw() {
   }
 
   if (laserScanLoaded) {
-    image(laserMovie, 540, 480, 320, 240);
-  }
-
-  if (processing) {
-    if (!laserMovie.done()) {
-      processScanFrame();
-      frame++;
-    }
-    
-    image(laserImage, 220, 0);
+    image(laserImage, 540, 480, 320, 240);
   }
 
   // window outlines
@@ -180,6 +215,8 @@ void draw() {
   line(220, 0, 220, height);
   line(220, 480, width, 480);
   line(540, 480, 540, height);
+  
+//  controlP5.draw();
 }
 
 void controlEvent(ControlEvent theEvent) {
@@ -266,7 +303,7 @@ public void laserScan(int theValue) {
       // make sure the laser is really on!
       laser(true);
       delay(100);
-      movie = new MovieMaker(this, 640, 480, laserFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
+      movie = new MovieMaker(this, videoWidth, videoHeight, laserFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
       serial.write('2');
       recordingType = "laser";
       recording = true;
@@ -302,7 +339,7 @@ public void textureScan(int theValue) {
     if (textureFilename == null) {
       println("ERROR: No texture output file was selected");
     } else {
-      movie = new MovieMaker(this, 640, 480, textureFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
+      movie = new MovieMaker(this, videoWidth, videoHeight, textureFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
       serial.write('2');
       recording = true;
       recordingType = "texture";
@@ -319,17 +356,64 @@ public void serialConnect() {
 }
 
 public void camConnect() {
-  cam = new Capture(this, 640, 480, camPort, framerate);
+  cam = new Capture(this, videoWidth, videoHeight, camPort, framerate);
   camConnected = true;
 }
 
 public void processScans() {
-  processing = true;
-  camConnected = false;
+  plyFilename = selectOutput("Save scan .ply to..."); 
+  if (plyFilename == null) {
+    println("ERROR: No ply output file was selected");
+  } else {
+    processing = true;
+    camConnected = false;
+    println("Processing " + laserMovie.getFrameCount() + " frames...");
+  }
+}
+
+//public float ASAtoSAS(float angleA, float lengthB, float angleC, float lengthA, float angleB, float lengthC) {
+public float ASAtoSAS(float angleA, float lengthB, float angleC) {
+  float lengthA = 0.0;
+  
+  // find the missing angle
+  float bb = 180.0 - (angleA + angleC);
+  
+//  if (angleB) {
+//    angleB = bb;
+//  }
+    
+  angleA *= degreesToRadians;
+  angleC *= degreesToRadians;
+  bb *= degreesToRadians;
+  
+  // use sine rule
+  
+  float sinB = sin(bb);
+  
+  if (sinB == 0.0) {
+//    if (lengthA) {
+//      lengthA = lengthB / 2.0; // one valid interpretation
+//    }
+//    if (lengthC) {
+//      lengthC = lengthB / 2.0;
+//    } 
+  } else {
+//    if (lengthA) {
+//      lengthA = lengthB * sin(angleA) / sinB;
+//    }
+//    if (lengthC > 0) {
+//      lengthC = lengthB * sin(angleC) / sinB;
+//    }
+    lengthA = lengthB * sin(angleA) / sinB;
+  }
+  
+  return lengthA;
 }
 
 public void processScanFrame() {
-//  println("Processing frame: " + frame);
+  // code based on http://www.sjbaker.org/wiki/index.php?title=A_Simple_3D_Scanner
+  
+//  println("Processing frame: " + frame + "/" + laserMovie.getFrameCount());
   
   laserMovie.gotoFrameNumber(frame);
 
@@ -344,11 +428,14 @@ public void processScanFrame() {
   
   int index = 0;
   
-  for (int y = 0; y < 480; y++) {
+  float frameAngle = float(frame) * (360.0 / float(laserMovie.getFrameCount()));
+  
+  for (int y = 0; y < videoHeight; y++) {
+    // find the brightest pixel
     brightestValue = 0;
-    brightestX = 0;
+    brightestX = -1;
     
-    for (int x = 0; x < 640; x++) {      
+    for (int x = 0; x < videoWidth; x++) {
       int pixelValue = laserImage.pixels[index];      
       float pixelBrightness = brightness(pixelValue);
       
@@ -358,54 +445,33 @@ public void processScanFrame() {
       }
       
       index++;
-      
     }
     
     if (brightestX > 0) {
-      laserImage.pixels[y*640+brightestX] = color(0, 255, 0);
+      laserImage.pixels[y*videoWidth+brightestX] = color(0, 255, 0);
     }
     
+    float radius;
+    float camAngle = camHFOV * (0.5 - float(brightestX) / float(videoWidth));
+    
+    radius = ASAtoSAS(camAngle, camDistance, laserOffset);
+    
+    float pointX = radius * sin(frameAngle * degreesToRadians);
+    float pointY = radius * cos(frameAngle * degreesToRadians);
+    float pointZ = atan((camVFOV * degreesToRadians / 2.0)) * 2.0 * camDistance * float(frame) / float(videoHeight);
+    
+//    stroke(255);
+//    point(pointX, pointY, pointZ);
+//    rotateX(90);
+//    translate(220, 220);
+//    scale(0.2);
+//    println("line: " + y + " point: " + pointX + "," + pointY + "," + pointZ);
+//    println("brightestX: " + brightestX + " camAngle: " + camAngle + " radius: " + radius);
+    float[] thisPoint = {pointX, pointY, pointZ};
+//    println(thisPoint);
+    pointList.add(thisPoint);
   }
 
   laserImage.updatePixels();
 }
-
-//void setup() {
-//  size(w * 2, h);
-//  opencv = new OpenCV(this);
-//  opencv.movie("gnome360.mov", w, h);
-//  //opencv.movie("tux.avi", w, h);
-//}
-//
-//void draw() {
-//  opencv.read();
-//
-//  PImage img = opencv.image();
-//
-//  image(img, 0, 0);  
-//  
-//  int brightestX = 0;
-//  float brightestValue = 0;
-//  img.loadPixels();
-//  int index = 0;
-//  for (int y = 0; y < h; y++) {
-//    brightestValue = 0;
-//    brightestX = 0;
-//    for (int x = 0; x < w; x++) {
-//      int pixelValue = img.pixels[index];
-//      float pixelBrightness = brightness(pixelValue);
-//      if (pixelBrightness > brightestValue && pixelBrightness > threshold) {
-//        brightestValue = pixelBrightness;
-//        brightestX = x;
-//      }
-//      index++;
-//    }
-//    if (brightestX > 0) {
-//      img.pixels[y*w+brightestX] = color(0, 255, 0);
-//    }
-//  }
-//
-//  img.updatePixels();
-//  image(img, w, 0);  
-//}
 
