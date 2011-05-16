@@ -196,7 +196,8 @@ void draw() {
       processing = false;
     } else {
       processScanFrame();
-      frame++;
+      frame += frameSkip;
+//      frame++;
     }
     
 //    image(laserImage, 220, 0);
@@ -361,7 +362,8 @@ public void camConnect() {
 }
 
 public void processScans() {
-  plyFilename = selectOutput("Save scan .ply to..."); 
+//  plyFilename = selectOutput("Save scan .ply to..."); 
+  plyFilename = "data/gnome.ply";
   if (plyFilename == null) {
     println("ERROR: No ply output file was selected");
   } else {
@@ -414,7 +416,6 @@ public void processScanFrame() {
   // code based on http://www.sjbaker.org/wiki/index.php?title=A_Simple_3D_Scanner
   
 //  println("Processing frame: " + frame + "/" + laserMovie.getFrameCount());
-  
   laserMovie.gotoFrameNumber(frame);
 
   laserMovie.read();
@@ -451,14 +452,25 @@ public void processScanFrame() {
       laserImage.pixels[y*videoWidth+brightestX] = color(0, 255, 0);
     }
     
+    if (brightestX != -1) {
+    
     float radius;
     float camAngle = camHFOV * (0.5 - float(brightestX) / float(videoWidth));
     
-    radius = ASAtoSAS(camAngle, camDistance, laserOffset);
+//    float camPointDistance = sqrt((pow(camDistance, 2) + pow(float(videoWidth)/2 - float(brightestX),2) - 2 * camDistance * float(videoWidth)/2 - float(brightestX) * cos(90.0)) * -1);
+//    float myCamAngle = (sin(90.0) / camPointDistance) * float(videoWidth)/2 - float(brightestX);
+//    println(camPointDistance + " brightestX: " + brightestX + " frame: " + frame + " line: " + y + " camAngle: " + camAngle + " myCamAngle: " + myCamAngle);
+
+//    radius = ASAtoSAS(camAngle, camDistance, laserOffset);
+    float centerAngle = 180.0 - camAngle + laserOffset;
+    radius = camDistance * sin(camAngle * degreesToRadians) / sin(centerAngle * degreesToRadians);    
     
+//    float pointX = radius * sin(frameAngle * degreesToRadians);
+//    float pointY = radius * cos(frameAngle * degreesToRadians);
+//    float pointZ = atan((camVFOV * degreesToRadians / 2.0)) * 2.0 * camDistance * float(frame) / float(videoHeight);
     float pointX = radius * sin(frameAngle * degreesToRadians);
     float pointY = radius * cos(frameAngle * degreesToRadians);
-    float pointZ = atan((camVFOV * degreesToRadians / 2.0)) * 2.0 * camDistance * float(frame) / float(videoHeight);
+    float pointZ = -y;
     
 //    stroke(255);
 //    point(pointX, pointY, pointZ);
@@ -470,6 +482,7 @@ public void processScanFrame() {
     float[] thisPoint = {pointX, pointY, pointZ};
 //    println(thisPoint);
     pointList.add(thisPoint);
+    }
   }
 
   laserImage.updatePixels();
