@@ -462,8 +462,8 @@ public void processScanFrame() {
 //    println(camPointDistance + " brightestX: " + brightestX + " frame: " + frame + " line: " + y + " camAngle: " + camAngle + " myCamAngle: " + myCamAngle);
 
 //    radius = ASAtoSAS(camAngle, camDistance, laserOffset);
-    float centerAngle = 180.0 - camAngle + laserOffset;
-    radius = camDistance * sin(camAngle * degreesToRadians) / sin(centerAngle * degreesToRadians);    
+    float pointAngle = 180.0 - camAngle + laserOffset;
+    radius = camDistance * sin(camAngle * degreesToRadians) / sin(pointAngle * degreesToRadians);
     
 //    float pointX = radius * sin(frameAngle * degreesToRadians);
 //    float pointY = radius * cos(frameAngle * degreesToRadians);
