@@ -55,9 +55,9 @@ float camHFOV = 50.0;
 // degrees
 float camVFOV = camHFOV * 4.0 / 5.0;
 // from camera to center of table in mm
-float camDistance = 304.8;
+float camDistance = 304.8; // 1 foot
 // degrees
-float laserOffset = 15.0;
+float laserOffset = 45.0; // 15? 45?
 int frameSkip = 1;
 int pointSkip = 1;
 float radiansToDegrees = 180.0 / 3.14159;
@@ -140,9 +140,11 @@ void setup() {
   laserOffsetField.setText(str(laserOffset));
 
   controlP5.addButton("processScans", 0, 10, 320, 90, 15).captionLabel().set("Process Scans!");
+
+  controlP5.addButton("testSpin", 0, 10, 360, 90, 15).captionLabel().set("Test Spin");
   
 //  loadTextureScan();
-  loadLaserScan();
+//  loadLaserScan();
 }
 
 void draw() {
@@ -362,14 +364,20 @@ public void camConnect() {
 }
 
 public void processScans() {
-//  plyFilename = selectOutput("Save scan .ply to..."); 
-  plyFilename = "data/gnome.ply";
+  plyFilename = selectOutput("Save scan .ply to..."); 
+//  plyFilename = "data/gnome.ply";
   if (plyFilename == null) {
     println("ERROR: No ply output file was selected");
   } else {
     processing = true;
     camConnected = false;
     println("Processing " + laserMovie.getFrameCount() + " frames...");
+  }
+}
+
+public void testSpin() {
+  if (serialConnected && !recording) {
+    serial.write('4');
   }
 }
 
@@ -438,7 +446,8 @@ public void processScanFrame() {
     
     for (int x = 0; x < videoWidth; x++) {
       int pixelValue = laserImage.pixels[index];      
-      float pixelBrightness = brightness(pixelValue);
+//      float pixelBrightness = brightness(pixelValue);
+      float pixelBrightness = pixelValue >> 16 & 0xFF;
       
       if (pixelBrightness > brightestValue && pixelBrightness > threshold) {
         brightestValue = pixelBrightness;

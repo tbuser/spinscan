@@ -2,7 +2,8 @@ int ledPin =  13;
 int laserPin = 2;
 int dirPin = 3;
 int stepPin = 4;
-int stepSpeed = 10000;
+int stepSpeed = 4000;
+float gearRatio = 61/10;
 
 void setup() {
   pinMode(laserPin, OUTPUT);
@@ -13,9 +14,9 @@ void setup() {
   Serial.begin(9600);
 }
 
-void stepper(int turnDegrees, int stepSpeed) {
+void stepper(float turnDegrees, int stepSpeed) {
   boolean dir;
-  int steps;
+  float steps;
   
   if (turnDegrees > 0) {
     dir = true;
@@ -27,12 +28,12 @@ void stepper(int turnDegrees, int stepSpeed) {
 
 //  delay(50);
 
-  steps = turnDegrees/360 * 1600;
+  steps = turnDegrees/360.0 * 1600.0 * gearRatio;
 
   for (int i=0; i<steps ;i++) {
-    digitalWrite(stepPin, HIGH);
-    delayMicroseconds(stepSpeed);
     digitalWrite(stepPin, LOW);
+//    delayMicroseconds(150);
+    digitalWrite(stepPin, HIGH);
     delayMicroseconds(stepSpeed);
   }
 }
@@ -60,6 +61,9 @@ void loop() {
     laser(true);
     stepper(360, stepSpeed);
     laser(false);
+    Serial.println("OK");
+  } else if (val == '4') {
+    stepper(360, stepSpeed);
     Serial.println("OK");
   } else {
     Serial.println("Unknown Command");
