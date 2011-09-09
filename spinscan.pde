@@ -11,6 +11,7 @@ OpenCV opencv;
 SteppedMovie textureMovie;
 SteppedMovie laserMovie;
 ArrayList pointList = new ArrayList();
+ArrayList colorList = new ArrayList();
 PrintWriter plyFile;
 
 int width = 860;
@@ -183,11 +184,15 @@ void draw() {
       plyFile.println("property float x");
       plyFile.println("property float y");
       plyFile.println("property float z");
+      plyFile.println("property uchar red");
+      plyFile.println("property uchar green");
+      plyFile.println("property uchar blue");
       plyFile.println("end_header");
       
       for (int i = 0; i < pointList.size(); i++) {
         float[] thisPoint = (float[]) pointList.get(i);
-        plyFile.println(thisPoint[0] + " " + thisPoint[1] + " " + thisPoint[2]);
+        int[] thisColor = (int[]) colorList.get(i);
+        plyFile.println(thisPoint[0] + " " + thisPoint[1] + " " + thisPoint[2] + " " + thisColor[0] + " " + thisColor[1] + " " + thisColor[2]);
 //        println("Writing line: " + i);
       }
 
@@ -425,15 +430,18 @@ public void processScanFrame() {
   
 //  println("Processing frame: " + frame + "/" + laserMovie.getFrameCount());
   laserMovie.gotoFrameNumber(frame);
-
   laserMovie.read();
-
   laserImage = laserMovie.get();
+
+  textureMovie.gotoFrameNumber(frame);
+  textureMovie.read();
+  textureImage = textureMovie.get();
 
   int brightestX = 0;
   float brightestValue = 0;
   
   laserImage.loadPixels();
+  textureImage.loadPixels();
   
   int index = 0;
   
@@ -459,6 +467,11 @@ public void processScanFrame() {
     
     if (brightestX > 0) {
       laserImage.pixels[y*videoWidth+brightestX] = color(0, 255, 0);
+      float r = red(textureImage.pixels[y*videoWidth+brightestX]);
+      float g = green(textureImage.pixels[y*videoWidth+brightestX]);
+      float b = blue(textureImage.pixels[y*videoWidth+brightestX]);
+      int[] thisColor = {int(r), int(g), int(b)};
+      colorList.add(thisColor);
     }
     
     if (brightestX != -1) {    
