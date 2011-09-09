@@ -461,36 +461,37 @@ public void processScanFrame() {
       laserImage.pixels[y*videoWidth+brightestX] = color(0, 255, 0);
     }
     
-    if (brightestX != -1) {
+    if (brightestX != -1) {    
+      float radius;
+      float camAngle = camHFOV * (0.5 - float(brightestX) / float(videoWidth));
     
-    float radius;
-    float camAngle = camHFOV * (0.5 - float(brightestX) / float(videoWidth));
-    
-//    float camPointDistance = sqrt((pow(camDistance, 2) + pow(float(videoWidth)/2 - float(brightestX),2) - 2 * camDistance * float(videoWidth)/2 - float(brightestX) * cos(90.0)) * -1);
-//    float myCamAngle = (sin(90.0) / camPointDistance) * float(videoWidth)/2 - float(brightestX);
-//    println(camPointDistance + " brightestX: " + brightestX + " frame: " + frame + " line: " + y + " camAngle: " + camAngle + " myCamAngle: " + myCamAngle);
+      // float camPointDistance = sqrt((pow(camDistance, 2) + pow(float(videoWidth)/2 - float(brightestX),2) - 2 * camDistance * float(videoWidth)/2 - float(brightestX) * cos(90.0)) * -1);
+      // float myCamAngle = (sin(90.0) / camPointDistance) * float(videoWidth)/2 - float(brightestX);
+      // println(camPointDistance + " brightestX: " + brightestX + " frame: " + frame + " line: " + y + " camAngle: " + camAngle + " myCamAngle: " + myCamAngle);
 
-//    radius = ASAtoSAS(camAngle, camDistance, laserOffset);
-    float pointAngle = 180.0 - camAngle + laserOffset;
-    radius = camDistance * sin(camAngle * degreesToRadians) / sin(pointAngle * degreesToRadians);
+      // radius = ASAtoSAS(camAngle, camDistance, laserOffset);
+      float pointAngle = 180.0 - camAngle + laserOffset;
+      radius = camDistance * sin(camAngle * degreesToRadians) / sin(pointAngle * degreesToRadians);
     
-//    float pointX = radius * sin(frameAngle * degreesToRadians);
-//    float pointY = radius * cos(frameAngle * degreesToRadians);
-//    float pointZ = atan((camVFOV * degreesToRadians / 2.0)) * 2.0 * camDistance * float(frame) / float(videoHeight);
-    float pointX = radius * sin(frameAngle * degreesToRadians);
-    float pointY = radius * cos(frameAngle * degreesToRadians);
-    float pointZ = -y;
+      // float pointX = radius * sin(frameAngle * degreesToRadians);
+      // float pointY = radius * cos(frameAngle * degreesToRadians);
+      // float pointZ = atan((camVFOV * degreesToRadians / 2.0)) * 2.0 * camDistance * float(frame) / float(videoHeight);
+      float pointX = radius * sin(frameAngle * degreesToRadians);
+      float pointY = radius * cos(frameAngle * degreesToRadians);
+      // float pointZ = -y; // hack
+      float pointZ = -atan((camVFOV * degreesToRadians / 2.0)) * 2.0 * camDistance * float(y) / float(videoHeight);
     
-//    stroke(255);
-//    point(pointX, pointY, pointZ);
-//    rotateX(90);
-//    translate(220, 220);
-//    scale(0.2);
-//    println("line: " + y + " point: " + pointX + "," + pointY + "," + pointZ);
-//    println("brightestX: " + brightestX + " camAngle: " + camAngle + " radius: " + radius);
-    float[] thisPoint = {pointX, pointY, pointZ};
-//    println(thisPoint);
-    pointList.add(thisPoint);
+      // stroke(255);
+      // point(pointX, pointY, pointZ);
+      // rotateX(90);
+      // translate(220, 220);
+      // scale(0.2);
+      // println("line: " + y + " point: " + pointX + "," + pointY + "," + pointZ);
+      // println("brightestX: " + brightestX + " camAngle: " + camAngle + " radius: " + radius);
+      
+      float[] thisPoint = {pointX, pointY, pointZ};
+      // println(thisPoint);
+      pointList.add(thisPoint);
     }
   }
 
