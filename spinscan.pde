@@ -38,6 +38,8 @@ boolean camConnected = false;
 
 String[] serialPorts;
 String[] camPorts;
+int command_start_time = 0;
+int command_end_time = 0;
 
 ListBox serialList;
 ListBox camList;
@@ -269,7 +271,10 @@ void serialEvent(Serial serial) {
     recordingType = null;
     laser(false);
   }
+  command_end_time = millis();
+
   println("RECEIVED: " + serialResponse);
+  println("COMMAND TOOK: " + ((command_end_time - command_start_time)/1000) + " seconds\n");
 }
 
 public void loadTextureScan() {
@@ -293,6 +298,8 @@ public void loadLaserScan() {
 }
 
 public void laser(boolean on) {
+  command_start_time = millis();
+
   if (serialConnected && !recording) {
     if (on) {
       serial.write('1');
@@ -312,6 +319,7 @@ public void laserScan(int theValue) {
       laser(true);
       delay(100);
       movie = new MovieMaker(this, videoWidth, videoHeight, laserFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
+      command_start_time = millis();
       serial.write('2');
       recordingType = "laser";
       recording = true;
@@ -348,6 +356,7 @@ public void textureScan(int theValue) {
       println("ERROR: No texture output file was selected");
     } else {
       movie = new MovieMaker(this, videoWidth, videoHeight, textureFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
+      command_start_time = millis();
       serial.write('2');
       recording = true;
       recordingType = "texture";
@@ -382,7 +391,8 @@ public void processScans() {
 
 public void testSpin() {
   if (serialConnected && !recording) {
-    serial.write('4');
+    command_start_time = millis();
+    serial.write('2');
   }
 }
 
