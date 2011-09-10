@@ -16,7 +16,7 @@ PrintWriter plyFile;
 
 int width = 860;
 int height = 720;
-int framerate = 30;
+int framerate = 15;
 int threshold = 100;
 int frame = 1;
 
@@ -259,6 +259,8 @@ void controlEvent(ControlEvent theEvent) {
 
 void serialEvent(Serial serial) {
   serialResponse = serial.readStringUntil('\n');
+  command_end_time = millis();
+
   if (recording) {
     recording = false;
     movie.finish();
@@ -271,7 +273,6 @@ void serialEvent(Serial serial) {
     recordingType = null;
     laser(false);
   }
-  command_end_time = millis();
 
   println("RECEIVED: " + serialResponse);
   println("COMMAND TOOK: " + ((command_end_time - command_start_time)/1000) + " seconds\n");
@@ -316,6 +317,7 @@ public void laserScan(int theValue) {
       println("ERROR: No laser output file was selected");
     } else {
       // make sure the laser is really on!
+      command_start_time = millis();
       laser(true);
       delay(100);
       movie = new MovieMaker(this, videoWidth, videoHeight, laserFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
