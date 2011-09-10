@@ -30,11 +30,11 @@ void stepper(float turnDegrees, int stepSpeed) {
 
   steps = turnDegrees/360.0 * 1600.0 * gearRatio;
 
-  for (int i=0; i<steps ;i++) {
+  for (int i = 0; i < steps; i++) {
     digitalWrite(stepPin, LOW);
-//    delayMicroseconds(150);
+    delayMicroseconds(stepSpeed/2);
     digitalWrite(stepPin, HIGH);
-    delayMicroseconds(stepSpeed);
+    delayMicroseconds(stepSpeed/2);
   }
 }
 
@@ -55,15 +55,12 @@ void loop() {
     laser(true);
     Serial.println("OK");
   } else if (val == '2') {
-    stepper(360, stepSpeed);
+    stepper(360.0, stepSpeed);
     Serial.println("OK");
   } else if (val == '3') {
     laser(true);
-    stepper(360, stepSpeed);
+    stepper(360.0, stepSpeed);
     laser(false);
-    Serial.println("OK");
-  } else if (val == '4') {
-    stepper(360, stepSpeed);
     Serial.println("OK");
   } else {
     Serial.println("Unknown Command");
