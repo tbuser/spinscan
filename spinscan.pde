@@ -2,7 +2,10 @@ import processing.serial.*;
 import processing.video.*;
 import hypermedia.video.*;
 import controlP5.*;
+import processing.opengl.*;
+import com.hardcorepawn.*;
 
+SuperPoint p;
 ControlP5 controlP5;
 Serial serial;
 Capture cam;
@@ -17,7 +20,7 @@ PrintWriter plyFile;
 int width = 860;
 int height = 720;
 int framerate = 15;
-int threshold = 100;
+int threshold = 80;
 int frame = 1;
 
 int videoWidth = 640;
@@ -53,10 +56,10 @@ String textureFilename = "data/texture.mov";
 String laserFilename = "data/laser.mov";
 String plyFilename = null;
 
+// degrees 56 zoom in 75 zoom out
+float camHFOV = 75.0;
 // degrees
-float camHFOV = 50.0;
-// degrees
-float camVFOV = camHFOV * 4.0 / 5.0;
+float camVFOV = (camHFOV * 4.0) / 5.0;
 // from camera to center of table in mm
 float camDistance = 304.8; // 1 foot
 // degrees
@@ -77,7 +80,10 @@ PImage laserImage;
 PImage lineImage;
 
 void setup() {
-  size(width, height);
+  camPorts = Capture.list();
+
+  size(width, height, OPENGL);
+  p = new SuperPoint(this);
 //  smooth();
   frameRate(framerate);
 
@@ -104,7 +110,6 @@ void setup() {
   controlP5.addSlider("contrast", -128, 128, contrast, 10, 80, 150, 10);
   Slider brightnessSlider = (Slider)controlP5.controller("brightness");
 
-  camPorts = Capture.list();
   camList = controlP5.addListBox("camList", 10, 50, 200, 120);
   camList.setItemHeight(15);
   camList.setBarHeight(15);
@@ -146,8 +151,8 @@ void setup() {
 
   controlP5.addButton("testSpin", 0, 10, 360, 90, 15).captionLabel().set("Test Spin");
   
-//  loadTextureScan();
-//  loadLaserScan();
+  //loadTextureScan();
+  //loadLaserScan();
 }
 
 void draw() {
@@ -227,6 +232,14 @@ void draw() {
   line(540, 480, 540, height);
   
 //  controlP5.draw();
+
+  pushMatrix();
+  translate(220+((width-220)/2),240/4);
+  if (!processing) {
+    rotateY(frameCount/50.0);
+  }
+  p.draw(1);
+  popMatrix();
 }
 
 void controlEvent(ControlEvent theEvent) {
@@ -398,45 +411,6 @@ public void testSpin() {
   }
 }
 
-//public float ASAtoSAS(float angleA, float lengthB, float angleC, float lengthA, float angleB, float lengthC) {
-public float ASAtoSAS(float angleA, float lengthB, float angleC) {
-  float lengthA = 0.0;
-  
-  // find the missing angle
-  float bb = 180.0 - (angleA + angleC);
-  
-//  if (angleB) {
-//    angleB = bb;
-//  }
-    
-  angleA *= degreesToRadians;
-  angleC *= degreesToRadians;
-  bb *= degreesToRadians;
-  
-  // use sine rule
-  
-  float sinB = sin(bb);
-  
-  if (sinB == 0.0) {
-//    if (lengthA) {
-//      lengthA = lengthB / 2.0; // one valid interpretation
-//    }
-//    if (lengthC) {
-//      lengthC = lengthB / 2.0;
-//    } 
-  } else {
-//    if (lengthA) {
-//      lengthA = lengthB * sin(angleA) / sinB;
-//    }
-//    if (lengthC > 0) {
-//      lengthC = lengthB * sin(angleC) / sinB;
-//    }
-    lengthA = lengthB * sin(angleA) / sinB;
-  }
-  
-  return lengthA;
-}
-
 public void processScanFrame() {
   // code based on http://www.sjbaker.org/wiki/index.php?title=A_Simple_3D_Scanner
   
@@ -466,7 +440,6 @@ public void processScanFrame() {
     
     for (int x = 0; x < videoWidth; x++) {
       int pixelValue = laserImage.pixels[index];      
-//      float pixelBrightness = brightness(pixelValue);
       float pixelBrightness = pixelValue >> 16 & 0xFF;
       
       if (pixelBrightness > brightestValue && pixelBrightness > threshold) {
@@ -477,46 +450,39 @@ public void processScanFrame() {
       index++;
     }
     
+    int[] thisColor = new int[3];
+    float[] thisPoint = new float[3];
+    
     if (brightestX > 0) {
       laserImage.pixels[y*videoWidth+brightestX] = color(0, 255, 0);
       float r = red(textureImage.pixels[y*videoWidth+brightestX]);
       float g = green(textureImage.pixels[y*videoWidth+brightestX]);
       float b = blue(textureImage.pixels[y*videoWidth+brightestX]);
-      int[] thisColor = {int(r), int(g), int(b)};
+      thisColor[0] = int(r);
+      thisColor[1] = int(g);
+      thisColor[2] = int(b);
       colorList.add(thisColor);
-    }
-    
-    if (brightestX != -1) {    
+
       float radius;
       float camAngle = camHFOV * (0.5 - float(brightestX) / float(videoWidth));
     
-      // float camPointDistance = sqrt((pow(camDistance, 2) + pow(float(videoWidth)/2 - float(brightestX),2) - 2 * camDistance * float(videoWidth)/2 - float(brightestX) * cos(90.0)) * -1);
-      // float myCamAngle = (sin(90.0) / camPointDistance) * float(videoWidth)/2 - float(brightestX);
-      // println(camPointDistance + " brightestX: " + brightestX + " frame: " + frame + " line: " + y + " camAngle: " + camAngle + " myCamAngle: " + myCamAngle);
-
-      // radius = ASAtoSAS(camAngle, camDistance, laserOffset);
       float pointAngle = 180.0 - camAngle + laserOffset;
       radius = camDistance * sin(camAngle * degreesToRadians) / sin(pointAngle * degreesToRadians);
     
-      // float pointX = radius * sin(frameAngle * degreesToRadians);
-      // float pointY = radius * cos(frameAngle * degreesToRadians);
-      // float pointZ = atan((camVFOV * degreesToRadians / 2.0)) * 2.0 * camDistance * float(frame) / float(videoHeight);
       float pointX = radius * sin(frameAngle * degreesToRadians);
       float pointY = radius * cos(frameAngle * degreesToRadians);
-      // float pointZ = -y; // hack
       float pointZ = -atan((camVFOV * degreesToRadians / 2.0)) * 2.0 * camDistance * float(y) / float(videoHeight);
     
-      // stroke(255);
-      // point(pointX, pointY, pointZ);
-      // rotateX(90);
-      // translate(220, 220);
-      // scale(0.2);
       // println("line: " + y + " point: " + pointX + "," + pointY + "," + pointZ);
       // println("brightestX: " + brightestX + " camAngle: " + camAngle + " radius: " + radius);
       
-      float[] thisPoint = {pointX, pointY, pointZ};
+      thisPoint[0] = pointX;
+      thisPoint[1] = pointY;
+      thisPoint[2] = pointZ;
       // println(thisPoint);
       pointList.add(thisPoint);
+
+      p.addPoint(thisPoint[0], -thisPoint[2], -thisPoint[1], r/255.0, g/255.0, b/255.0, 1);
     }
   }
 

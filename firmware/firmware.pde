@@ -3,7 +3,7 @@ int laserPin = 2;
 int dirPin = 3;
 int stepPin = 4;
 int stepSpeed = 4000;
-float gearRatio = 61/10;
+float gearRatio = 61.0/10.0;
 
 void setup() {
   pinMode(laserPin, OUTPUT);
