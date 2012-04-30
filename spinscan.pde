@@ -14,13 +14,14 @@ OpenCV opencv;
 SteppedMovie textureMovie;
 SteppedMovie laserMovie;
 ArrayList pointList = new ArrayList();
+ArrayList normalList = new ArrayList();
 ArrayList colorList = new ArrayList();
 PrintWriter plyFile;
 
 int width = 860;
 int height = 720;
 int framerate = 15;
-int threshold = 80;
+int threshold = 30;
 int frame = 1;
 
 int videoWidth = 640;
@@ -191,6 +192,9 @@ void draw() {
       plyFile.println("property float x");
       plyFile.println("property float y");
       plyFile.println("property float z");
+      plyFile.println("property float nx");
+      plyFile.println("property float ny");
+      plyFile.println("property float nz");
       plyFile.println("property uchar red");
       plyFile.println("property uchar green");
       plyFile.println("property uchar blue");
@@ -198,8 +202,9 @@ void draw() {
       
       for (int i = 0; i < pointList.size(); i++) {
         float[] thisPoint = (float[]) pointList.get(i);
+        float[] thisNormal = (float[]) normalList.get(i);
         int[] thisColor = (int[]) colorList.get(i);
-        plyFile.println(thisPoint[0] + " " + thisPoint[1] + " " + thisPoint[2] + " " + thisColor[0] + " " + thisColor[1] + " " + thisColor[2]);
+        plyFile.println(thisPoint[0] + " " + thisPoint[1] + " " + thisPoint[2] + " " + thisNormal[0] + " " + thisNormal[1] + " " + thisNormal[2] + " " + thisColor[0] + " " + thisColor[1] + " " + thisColor[2]);
 //        println("Writing line: " + i);
       }
 
@@ -452,6 +457,7 @@ public void processScanFrame() {
     
     int[] thisColor = new int[3];
     float[] thisPoint = new float[3];
+    float[] thisNormal = new float[3];
     
     if (brightestX > 0) {
       laserImage.pixels[y*videoWidth+brightestX] = color(0, 255, 0);
@@ -481,6 +487,14 @@ public void processScanFrame() {
       thisPoint[2] = pointZ;
       // println(thisPoint);
       pointList.add(thisPoint);
+
+      // assume normals are all pointing outwards from 0,0,z = pointX,pointY,0 (should be point to camera...)
+      // normalize it
+      float normalLength = sqrt((pointX * pointX) + (pointY * pointY) + (0.0 * 0.0));
+      thisNormal[0] = pointX/(normalLength/2);
+      thisNormal[1] = pointY/(normalLength/2);
+      thisNormal[2] = 0.0;
+      normalList.add(thisNormal);
 
       p.addPoint(thisPoint[0], -thisPoint[2], -thisPoint[1], r/255.0, g/255.0, b/255.0, 1);
     }
