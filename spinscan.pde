@@ -20,12 +20,14 @@ PrintWriter plyFile;
 
 int width = 860;
 int height = 720;
-int framerate = 15;
-int threshold = 30;
+int framerate = 13;
+int threshold = 10; // 30
 int frame = 1;
 
 int videoWidth = 640;
 int videoHeight = 480;
+//int videoWidth = 800;
+//int videoHeight = 600;
 
 String serialResponse = null;
 boolean recording = false;
@@ -173,13 +175,13 @@ void draw() {
       movie.addFrame(opencvImage.pixels, opencvImage.width, opencvImage.height);
     } else {
       // don't waste cpu cycles while recording?
-      image(opencvImage, 220, 0);
+      image(opencvImage, 220, 0, 640, 480);
     }
 
     // main video window crosshair
     stroke(255);
-    line(videoWidth/2+220, 0, videoWidth/2+220, videoHeight);
-    line(220, videoHeight/2, videoWidth+220, videoHeight/2);
+    line(640/2+220, 0, 640/2+220, 480);
+    line(220, 480/2, 640+220, 480/2);
   }
 
   if (processing) {
@@ -490,9 +492,11 @@ public void processScanFrame() {
 
       // assume normals are all pointing outwards from 0,0,z = pointX,pointY,0 (should be point to camera...)
       // normalize it
-      float normalLength = sqrt((pointX * pointX) + (pointY * pointY) + (0.0 * 0.0));
-      thisNormal[0] = pointX/(normalLength/2);
-      thisNormal[1] = pointY/(normalLength/2);
+      // float normalLength = sqrt((pointX * pointX) + (pointY * pointY) + (0.0 * 0.0));
+      // thisNormal[0] = pointX/normalLength;
+      // thisNormal[1] = pointY/normalLength;
+      thisNormal[0] = pointX;
+      thisNormal[1] = pointY;
       thisNormal[2] = 0.0;
       normalList.add(thisNormal);
 
