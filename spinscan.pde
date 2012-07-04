@@ -16,7 +16,9 @@ SteppedMovie laserMovie;
 ArrayList pointList = new ArrayList();
 ArrayList normalList = new ArrayList();
 ArrayList colorList = new ArrayList();
+ArrayList splineList = new ArrayList();
 PrintWriter plyFile;
+PrintWriter splineFile;
 
 int width = 860;
 int height = 720;
@@ -49,7 +51,8 @@ int command_end_time = 0;
 
 ListBox serialList;
 ListBox camList;
-CheckBox laserBox;
+CheckBox laserLeftBox;
+CheckBox laserRightBox;
 Textfield camHFOVField;
 Textfield camVFOVField;
 Textfield camDistanceField;
@@ -58,6 +61,7 @@ Textfield laserOffsetField;
 String textureFilename = "data/texture.mov";
 String laserFilename = "data/laser.mov";
 String plyFilename = null;
+String splineFilename = null;
 
 // degrees 56 zoom in 75 zoom out
 float camHFOV = 75.0;
@@ -66,7 +70,7 @@ float camVFOV = (camHFOV * 4.0) / 5.0;
 // from camera to center of table in mm
 float camDistance = 304.8; // 1 foot
 // degrees
-float laserOffset = 45.0; // 15? 45?
+float laserOffset = 30.0; // 15? 45?
 int frameSkip = 1;
 int pointSkip = 1;
 float radiansToDegrees = 180.0 / 3.14159;
@@ -95,16 +99,23 @@ void setup() {
 
   controlP5 = new ControlP5(this);
 
-  laserBox = controlP5.addCheckBox("laserBox", 10, 100);
-  laserBox.setItemsPerRow(1);
-  laserBox.setSpacingColumn(30);
-  laserBox.setSpacingRow(10);
-  laserBox.addItem("Laser", 1);
+  laserLeftBox = controlP5.addCheckBox("laserLeftBox", 10, 100);
+  laserLeftBox.setItemsPerRow(1);
+  laserLeftBox.setSpacingColumn(30);
+  laserLeftBox.setSpacingRow(10);
+  laserLeftBox.addItem("Laser Left", 1);
+
+  laserRightBox = controlP5.addCheckBox("laserRightBox", 80, 100);
+  laserRightBox.setItemsPerRow(1);
+  laserRightBox.setSpacingColumn(30);
+  laserRightBox.setSpacingRow(10);
+  laserRightBox.addItem("Laser Right", 1);
 
   controlP5.addButton("textureScan", 0, 10, 120, 90, 15).captionLabel().set("Record Texture");
   controlP5.addButton("openTextureScan", 0, 230, height-25, 100, 15).captionLabel().set("Open Texture Scan");
 
-  controlP5.addButton("laserScan", 0, 120, 120, 90, 15).captionLabel().set("Record Laser");
+  controlP5.addButton("laserScan", 0, 120, 120, 90, 15).captionLabel().set("Record Left Laser");
+  controlP5.addButton("laserScan", 1, 120, 150, 90, 15).captionLabel().set("Record Right Laser");
   controlP5.addButton("openLaserScan", 0, 550, height-25, 100, 15).captionLabel().set("Open Laser Scan");
 
   controlP5.addSlider("brightness", -128, 128, contrast, 10, 60, 150, 10);
@@ -213,6 +224,27 @@ void draw() {
       plyFile.flush();
       plyFile.close();
       
+      splineFile = createWriter(splineFilename);
+      splineFile.println("[");
+      
+      for (int i = 0; i < splineList.size(); i++) {
+        splineFile.println("\t[");
+        
+        ArrayList spline = (ArrayList) splineList.get(i);
+
+        for (int s = 0; s < spline.size(); s++) {
+          float[] splinePoint = (float[]) spline.get(s);
+          splineFile.println("\t\t[" + splinePoint[0] + "," + splinePoint[1] + "," + splinePoint[2] + "]" + (s + 1 == spline.size() ? "" : ","));
+        }
+        
+        splineFile.println("\t]" + (i + 1 == splineList.size() ? "" : ","));
+      }
+      
+      splineFile.println("]");
+      
+      splineFile.flush();
+      splineFile.close();
+      
       println("Finished!");
       processing = false;
     } else {
@@ -265,11 +297,17 @@ void controlEvent(ControlEvent theEvent) {
       camList.captionLabel().set(camPort);
       camList.close();
       camConnect();
-    } else if (groupName == "laserBox") {
+    } else if (groupName == "laserLeftBox") {
       if (theEvent.group().arrayValue()[0] == 1.0) {
-        laser(true);
+        laser(0, true);
       } else {
-        laser(false);
+        laser(0, false);
+      }
+    } else if (groupName == "laserRightBox") {
+      if (theEvent.group().arrayValue()[0] == 1.0) {
+        laser(1, true);
+      } else {
+        laser(1, false);
       }
     } else {
       println("ERROR: Unknown group " + groupName);
@@ -291,7 +329,8 @@ void serialEvent(Serial serial) {
       loadLaserScan();
     }
     recordingType = null;
-    laser(false);
+    laser(0, false);
+    laser(1, false);
   }
 
   println("RECEIVED: " + serialResponse);
@@ -318,31 +357,43 @@ public void loadLaserScan() {
   laserScanLoaded = true;
 }
 
-public void laser(boolean on) {
+public void laser(int side, boolean on) {
   command_start_time = millis();
 
   if (serialConnected && !recording) {
-    if (on) {
-      serial.write('1');
+    if (side == 0) {
+      if (on) {
+        serial.write('1');
+      } else {
+        serial.write('0');
+      }
     } else {
-      serial.write('0');
+      if (on) {
+        serial.write('3');
+      } else {
+        serial.write('2');
+      }
     }
   }
 }
 
-public void laserScan(int theValue) {
+public void laserScan(int side) {
   if (serialConnected) {
     laserFilename = selectOutput("Save laser .mov to..."); 
     if (laserFilename == null) {
       println("ERROR: No laser output file was selected");
     } else {
       // make sure the laser is really on!
-      command_start_time = millis();
-      laser(true);
-      delay(100);
+      //command_start_time = millis();
+      //laser(side, true);
+      //delay(100);
       movie = new MovieMaker(this, videoWidth, videoHeight, laserFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
       command_start_time = millis();
-      serial.write('2');
+      if (side == 0) {
+        serial.write('5');
+      } else {
+        serial.write('6');
+      }
       recordingType = "laser";
       recording = true;
     }
@@ -377,9 +428,11 @@ public void textureScan(int theValue) {
     if (textureFilename == null) {
       println("ERROR: No texture output file was selected");
     } else {
+      //laser(0, false);
+      //laser(1, false);
       movie = new MovieMaker(this, videoWidth, videoHeight, textureFilename, framerate, MovieMaker.VIDEO, MovieMaker.LOSSLESS);
       command_start_time = millis();
-      serial.write('2');
+      serial.write('4');
       recording = true;
       recordingType = "texture";
     }
@@ -401,7 +454,7 @@ public void camConnect() {
 
 public void processScans() {
   plyFilename = selectOutput("Save scan .ply to..."); 
-//  plyFilename = "data/gnome.ply";
+  splineFilename = plyFilename + ".json";
   if (plyFilename == null) {
     println("ERROR: No ply output file was selected");
   } else {
@@ -414,12 +467,17 @@ public void processScans() {
 public void testSpin() {
   if (serialConnected && !recording) {
     command_start_time = millis();
-    serial.write('2');
+    serial.write('4');
   }
 }
 
 public void processScanFrame() {
   // code based on http://www.sjbaker.org/wiki/index.php?title=A_Simple_3D_Scanner
+  
+  laserOffset = Float.parseFloat(laserOffsetField.getText());
+  
+  // all the points in this frame ie. this spline
+  ArrayList framePointList = new ArrayList();
   
 //  println("Processing frame: " + frame + "/" + laserMovie.getFrameCount());
   laserMovie.gotoFrameNumber(frame);
@@ -489,7 +547,9 @@ public void processScanFrame() {
       thisPoint[2] = pointZ;
       // println(thisPoint);
       pointList.add(thisPoint);
+      framePointList.add(thisPoint);
 
+      // FIXME: these normals are bad
       // assume normals are all pointing outwards from 0,0,z = pointX,pointY,0 (should be point to camera...)
       // normalize it
       // float normalLength = sqrt((pointX * pointX) + (pointY * pointY) + (0.0 * 0.0));
@@ -503,6 +563,8 @@ public void processScanFrame() {
       p.addPoint(thisPoint[0], -thisPoint[2], -thisPoint[1], r/255.0, g/255.0, b/255.0, 1);
     }
   }
+
+  splineList.add(framePointList);
 
   laserImage.updatePixels();
 }

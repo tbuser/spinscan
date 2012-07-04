@@ -7,7 +7,8 @@
 #define MS1_PIN 11
 #define MS2_PIN 12
 #define MS3_PIN 13
-#define LASER_PIN 2
+#define LASER_LEFT_PIN 6
+#define LASER_RIGHT_PIN 7
 #define LED_PIN 13
 
 // define stepper
@@ -15,10 +16,11 @@
 // 200 * 16 microstepping
 #define STEPS_PER_REV 3200
 
-#define RPM 0.5
+#define RPM 1.0
 
 void setup() {
-  pinMode(LASER_PIN, OUTPUT);
+  pinMode(LASER_LEFT_PIN, OUTPUT);
+  pinMode(LASER_RIGHT_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
   pinMode(STEP_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
@@ -40,9 +42,13 @@ void rotate(float degrees, float speed) {
   digitalWrite(SLEEP_PIN, HIGH);
   digitalWrite(ENABLE_PIN, LOW);
 
+  digitalWrite(MS1_PIN, HIGH);
+  digitalWrite(MS2_PIN, HIGH);
+  digitalWrite(MS3_PIN, HIGH);
+
   int steps_per_second = speed * STEPS_PER_REV / 60;
   int step_delay = 1000 / steps_per_second;
-  float steps = STEPS_PER_REV * (degrees/360);
+  float steps = STEPS_PER_REV * (degrees/360.0);
   int dir = (degrees > 0) ? LOW : HIGH;
   
   digitalWrite(DIR_PIN, dir);
@@ -59,9 +65,13 @@ void rotate(float degrees, float speed) {
   digitalWrite(ENABLE_PIN, HIGH);
 }
 
-void laser(boolean state) {
+void laser(int side, boolean state) {
   digitalWrite(LED_PIN, state);
-  digitalWrite(LASER_PIN, state);
+  if (side == 0) {
+    digitalWrite(LASER_LEFT_PIN, state);
+  } else {
+    digitalWrite(LASER_RIGHT_PIN, state);
+  }
 }
 
 void loop() {
@@ -70,18 +80,36 @@ void loop() {
   int val = Serial.read();
 
   if (val == '0') {
-    laser(false);
+    // left laser off
+    laser(0, false);
     Serial.println("OK");
   } else if (val == '1') {
-    laser(true);
+    // left laser on
+    laser(0, true);
     Serial.println("OK");
   } else if (val == '2') {
-    rotate(360.0, RPM);
+    // right laser off
+    laser(1, false);
     Serial.println("OK");
   } else if (val == '3') {
-    laser(true);
+    // right laser on
+    laser(1, true);
+    Serial.println("OK");
+  } else if (val == '4') {
+    // test rotate
     rotate(360.0, RPM);
-    laser(false);
+    Serial.println("OK");
+  } else if (val == '5') {
+    // rotate with left laser on
+    laser(0, true);
+    rotate(360.0, RPM);
+    laser(0, false);
+    Serial.println("OK");
+  } else if (val == '6') {
+    // rotate with right laser on
+    laser(1, true);
+    rotate(360.0, RPM);
+    laser(1, false);
     Serial.println("OK");
   } else {
     Serial.println("Unknown Command");
