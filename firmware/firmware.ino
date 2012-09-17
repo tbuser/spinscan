@@ -14,9 +14,9 @@
 // define stepper
 //===============
 // 200 * 16 microstepping
-#define STEPS_PER_REV 3200
+#define STEPS_PER_REV 1600
 
-#define RPM 1.0
+#define RPM 2.0
 
 void setup() {
   pinMode(LASER_LEFT_PIN, OUTPUT);
@@ -29,7 +29,7 @@ void setup() {
   //==========================
   digitalWrite(MS1_PIN, HIGH);
   digitalWrite(MS2_PIN, HIGH);
-  digitalWrite(MS3_PIN, HIGH);
+  digitalWrite(MS3_PIN, LOW);
   digitalWrite(ENABLE_PIN, LOW);
   digitalWrite(SLEEP_PIN, LOW);
   delay(100);
@@ -44,12 +44,12 @@ void rotate(float degrees, float speed) {
 
   digitalWrite(MS1_PIN, HIGH);
   digitalWrite(MS2_PIN, HIGH);
-  digitalWrite(MS3_PIN, HIGH);
+  digitalWrite(MS3_PIN, LOW);
 
   int steps_per_second = speed * STEPS_PER_REV / 60;
   int step_delay = 1000 / steps_per_second;
   float steps = STEPS_PER_REV * (degrees/360.0);
-  int dir = (degrees > 0) ? LOW : HIGH;
+  int dir = (degrees > 0) ? HIGH : LOW;
   
   digitalWrite(DIR_PIN, dir);
   delay(100);
