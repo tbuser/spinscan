@@ -22,8 +22,8 @@ PrintWriter splineFile;
 
 int width = 860;
 int height = 720;
-int framerate = 13;
-int threshold = 10; // 30
+int framerate = 15;
+int threshold = 30; // 30
 int frame = 1;
 
 int videoWidth = 640;
@@ -64,11 +64,11 @@ String plyFilename = null;
 String splineFilename = null;
 
 // degrees 56 zoom in 75 zoom out
-float camHFOV = 75.0;
+float camVFOV = 75.0;
 // degrees
-float camVFOV = (camHFOV * 4.0) / 5.0;
+float camHFOV = (camVFOV * 4.0) / 5.0;
 // from camera to center of table in mm
-float camDistance = 304.8; // 1 foot
+float camDistance = 304.8; // 1 foot = 304.8
 // degrees
 float laserOffset = 30.0; // 15? 45?
 int frameSkip = 1;
